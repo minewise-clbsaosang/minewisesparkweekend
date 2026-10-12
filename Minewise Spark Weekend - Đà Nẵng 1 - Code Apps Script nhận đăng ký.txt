@@ -1,0 +1,85 @@
+// Minewise Spark Weekend Đà Nẵng #1 — nhận đăng ký từ trang bán hàng, ghi vào Google Sheet,
+// gửi email xác nhận cho phụ huynh và email báo cho chủ file (Sam).
+// Dán toàn bộ đoạn này vào Apps Script của Sheet MỚI (Extensions > Apps Script), rồi Deploy > New deployment > Web app
+// (Execute as: Me, Who has access: Anyone).
+
+var SHEET_NAME = 'DangKy';
+var HEADERS = [
+  'Thời gian', 'Tên bé', 'Số bé', 'Năm sinh', 'Phụ huynh', 'SĐT/Zalo', 'Email',
+  'Gói tham gia', 'Học phí tạm tính', 'Khả năng đọc', 'Camper SG Summer Camp 2026',
+  'Dị ứng / lưu ý', 'Ghi chú'
+];
+var ZALO_GROUP = 'https://zalo.me/g/nurkeycisg9g6woioxao';
+
+function doPost(e) {
+  var p = e.parameter || {};
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_NAME) || ss.insertSheet(SHEET_NAME);
+    if (sheet.getLastRow() === 0) {
+      sheet.appendRow(HEADERS);
+      sheet.setFrozenRows(1);
+    }
+    sheet.appendRow([
+      new Date(),
+      p.hoTenBe || '',
+      p.soBe || '',
+      p.namSinhBe ? "'" + p.namSinhBe : '',
+      p.hoTenPhuHuynh || '',
+      p.sdt ? "'" + p.sdt : '',
+      p.email || '',
+      p.goiThamGia || '',
+      p.tongTien || '',
+      p.khaNangDoc || '',
+      p.camper || '',
+      p.diUng || '',
+      p.ghiChu || ''
+    ]);
+  } finally {
+    lock.releaseLock();
+  }
+
+  var nhom3 = parseInt(p.soBe, 10) >= 3;
+
+  if (p.email) {
+    try {
+      MailApp.sendEmail({
+        to: p.email,
+        subject: 'Minewise Spark Weekend Đà Nẵng #1 — Đã nhận đăng ký của ' + (p.hoTenBe || 'bé'),
+        body: 'Chào ' + (p.hoTenPhuHuynh || 'ba/mẹ') + ',\n\n' +
+          'Minewise đã nhận được đăng ký cho ' + (p.hoTenBe || 'bé') + ' tại Minewise Spark Weekend Đà Nẵng #1, chiều Chủ Nhật 18/10/2026.\n\n' +
+          'Gói tham gia: ' + (p.goiThamGia || '') + '\n' +
+          'Số bé: ' + (p.soBe || '') + '\n' +
+          'Học phí tạm tính: ' + (p.tongTien || '') + '\n' +
+          (nhom3 ? 'Với nhóm đủ 3 bé, BTC sẽ xác nhận ưu đãi nhóm qua Zalo trước khi ba mẹ chuyển khoản.\n' : '') +
+          '\nThông tin chuyển khoản:\n' +
+          'Ngân hàng: Techcombank\n' +
+          'Chủ tài khoản: LƯƠNG THỊ XUÂN THANH\n' +
+          'Số tài khoản: 8524 2526 2728\n' +
+          'Nội dung chuyển khoản: ' + (p.hoTenBe || '') + ' - Spark Weekend Đà Nẵng 1\n\n' +
+          'Ba mẹ tham gia nhóm Zalo của chương trình và gửi ảnh chụp xác nhận chuyển khoản vào nhóm để BTC đối soát nhanh hơn:\n' +
+          ZALO_GROUP + '\n\n' +
+          'Thân mến,\nMinewise'
+      });
+    } catch (err) {
+      // Lỗi gửi email không chặn việc ghi vào Sheet
+    }
+  }
+
+  try {
+    MailApp.sendEmail({
+      to: Session.getEffectiveUser().getEmail(),
+      subject: 'Đăng ký mới Spark Weekend Đà Nẵng #1: ' + (p.hoTenBe || '') + ' (' + (p.goiThamGia || '') + ')',
+      body: 'Phụ huynh: ' + (p.hoTenPhuHuynh || '') + '\nSĐT/Zalo: ' + (p.sdt || '') + '\nEmail: ' + (p.email || '') +
+        '\nBé: ' + (p.hoTenBe || '') + ' (' + (p.soBe || '') + ' bé, sinh ' + (p.namSinhBe || '') + ')' +
+        '\nGói: ' + (p.goiThamGia || '') + ' · ' + (p.tongTien || '') +
+        '\nKhả năng đọc: ' + (p.khaNangDoc || '') + '\nCamper: ' + (p.camper || 'Không') +
+        '\nDị ứng/lưu ý: ' + (p.diUng || '') + '\nGhi chú: ' + (p.ghiChu || '') +
+        '\n\nXem đầy đủ trong Google Sheet.'
+    });
+  } catch (err2) {}
+
+  return ContentService.createTextOutput('OK');
+}
